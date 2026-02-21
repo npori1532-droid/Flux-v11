@@ -1,4 +1,5 @@
 import { Telegraf, Markup, Context } from 'telegraf';
+import axios from 'axios';
 
 // Define custom context if needed
 interface BotContext extends Context {
@@ -25,176 +26,209 @@ const DEV_INFO = {
 // Initialize Bot
 const bot = new Telegraf<BotContext>(BOT_TOKEN);
 
+// --- Helper Functions ---
+
+// Main Menu Keyboard (Persistent)
+const getMainMenu = () => {
+  return Markup.keyboard([
+    ['🎨 Generate Image', '👤 Account'],
+    ['📢 Channels', '👨‍💻 Developer'],
+    ['📞 Support', '🔐 Admin Panel']
+  ]).resize();
+};
+
+// Generation Mode Keyboard
+const getGenModeMenu = () => {
+  return Markup.keyboard([
+    ['✨ Flux 1.1 Ultra', '⚡ Flux 1.1 Pro'],
+    ['🔙 Main Menu']
+  ]).resize();
+};
+
 // --- Bot Logic ---
 
 bot.start((ctx) => {
   const firstName = ctx.from?.first_name || "User";
   const welcomeMessage = `
-👋 *Welcome, ${firstName}!*
+👋 *Hello, ${firstName}!*
 
-I am the **Flux 1.1 Pro Bot**, created by *${DEV_INFO.name}*.
-I can generate high-quality images using the Flux 1.1 Pro engine.
+Welcome to the **Ultimate Flux 1.1 AI Bot**. 
+I can generate hyper-realistic images using the latest Flux engines.
 
-⚠️ *Before we begin, please join our official channels to support us:*
+🚀 *Get Started:*
+Use the menu buttons below to navigate.
+
+⚠️ *Stay Updated:*
+Please join our channels for the latest updates and free prompts!
 `;
   
-  const buttons = Markup.inlineKeyboard([
+  // Inline buttons for links (Force Join style)
+  const linkButtons = Markup.inlineKeyboard([
     [Markup.button.url("📢 Official Channel", DEV_INFO.officialChannel)],
-    [Markup.button.url("🎮 FF Channel", DEV_INFO.ffChannel)],
-    [Markup.button.url("🛡️ Backup Channel", DEV_INFO.backupChannel)],
-    [Markup.button.url("💬 Chat Group", DEV_INFO.chatGroup)],
-    [Markup.button.callback("✅ JOINED", "check_subscription")]
+    [Markup.button.url("💬 Join Chat Group", DEV_INFO.chatGroup)],
+    [Markup.button.callback("✅ I Have Joined", "check_subscription")]
   ]);
 
-  ctx.replyWithMarkdown(welcomeMessage, buttons).catch(e => console.error("Failed to reply:", e));
+  ctx.replyWithMarkdown(welcomeMessage, linkButtons).catch(e => console.error("Failed to reply:", e));
 });
 
+// Handle "I Have Joined"
 bot.action("check_subscription", async (ctx) => {
   try {
-    await ctx.answerCbQuery("✅ Verified! Welcome aboard.");
+    await ctx.answerCbQuery("✅ Welcome to the family!");
     await ctx.deleteMessage().catch(() => {});
-    showMainMenu(ctx);
+    await ctx.reply("🎉 *Verification Successful!*", { parse_mode: "Markdown" });
+    await ctx.reply("Select an option from the menu below 👇", getMainMenu());
   } catch (e) {
     console.error("Error in check_subscription:", e);
   }
 });
 
-const showMainMenu = (ctx: BotContext) => {
-  const userId = ctx.from?.id.toString();
-  const isAdmin = userId && ADMIN_IDS.includes(userId);
+// --- Menu Handlers ---
 
-  let buttons = [
-    [Markup.button.callback("🎨 Generate Image (Flux Ultra)", "gen_ultra")],
-    [Markup.button.callback("🖼️ Generate Image (Flux Pro)", "gen_pro")],
-    [Markup.button.callback("👨‍💻 Developer", "dev_info")],
-  ];
+bot.hears('🔙 Main Menu', (ctx) => {
+  ctx.reply("🏠 Returned to Main Menu", getMainMenu());
+});
 
-  if (isAdmin) {
-    buttons.push([Markup.button.callback("🔐 Admin Panel", "admin_panel")]);
-  }
+bot.hears('🎨 Generate Image', (ctx) => {
+  ctx.reply("🎨 *Select Generation Engine:*\n\n✨ **Flux Ultra**: Best for realism & details.\n⚡ **Flux Pro**: Faster generation.", {
+    parse_mode: "Markdown",
+    ...getGenModeMenu()
+  });
+});
 
+bot.hears('📢 Channels', (ctx) => {
+  const buttons = Markup.inlineKeyboard([
+    [Markup.button.url("📢 Official Channel", DEV_INFO.officialChannel)],
+    [Markup.button.url("🎮 FF Channel", DEV_INFO.ffChannel)],
+    [Markup.button.url("🛡️ Backup Channel", DEV_INFO.backupChannel)],
+  ]);
+  ctx.reply("📢 *Our Official Channels*", { parse_mode: "Markdown", ...buttons });
+});
+
+bot.hears('👨‍💻 Developer', (ctx) => {
   ctx.replyWithMarkdown(
-    `🤖 *Main Menu*
-
-Select an option below to proceed.
-Powered by *${DEV_INFO.name}*`,
-    Markup.inlineKeyboard(buttons)
-  ).catch(e => console.error("Failed to show menu:", e));
-};
-
-bot.action("dev_info", (ctx) => {
-  ctx.replyWithMarkdown(
-    `👨‍💻 *Developer Information*
+    `👨‍💻 *Developer Profile*
 
 👤 **Name:** ${DEV_INFO.name}
+🛠 **Skills:** AI, Bot Development, Full Stack
 📢 **Channel:** [Tech Master A2Z](${DEV_INFO.officialChannel})
 
-_Creating professional bots for the community._`,
-    Markup.inlineKeyboard([[Markup.button.callback("🔙 Back", "back_home")]])
-  ).catch(e => console.error("Failed to show dev info:", e));
+_\"Innovation is our passion.\"_`,
+    Markup.inlineKeyboard([[Markup.button.url("Contact Developer", DEV_INFO.officialChannel)]])
+  );
 });
 
-bot.action("back_home", (ctx) => {
-  ctx.deleteMessage().catch(() => {});
-  showMainMenu(ctx);
+bot.hears('👤 Account', (ctx) => {
+  const userId = ctx.from.id;
+  const name = ctx.from.first_name;
+  ctx.replyWithMarkdown(`
+👤 *User Profile*
+
+🆔 **ID:** \`${userId}\`
+Mw **Name:** ${name}
+💎 **Plan:** Free Tier
+  `);
 });
 
-bot.action("gen_ultra", (ctx) => {
-  ctx.reply("To generate an Ultra image, send:\n`/ultra Your Prompt Here`", { parse_mode: "Markdown" }).catch(() => {});
+bot.hears('📞 Support', (ctx) => {
+  ctx.reply(`💬 Need help? Join our support group: ${DEV_INFO.chatGroup}`);
 });
 
-bot.action("gen_pro", (ctx) => {
-  ctx.reply("To generate a Pro image, send:\n`/pro Your Prompt Here`", { parse_mode: "Markdown" }).catch(() => {});
+// --- Image Generation Logic ---
+
+bot.hears('✨ Flux 1.1 Ultra', (ctx) => {
+  ctx.reply("✨ *Flux Ultra Mode Selected*\n\nSend your prompt starting with `/ultra`\nExample: `/ultra A cyberpunk cat in neon city`", { parse_mode: "Markdown" });
 });
+
+bot.hears('⚡ Flux 1.1 Pro', (ctx) => {
+  ctx.reply("⚡ *Flux Pro Mode Selected*\n\nSend your prompt starting with `/pro`\nExample: `/pro A cute robot holding a flower`", { parse_mode: "Markdown" });
+});
+
+// Helper to generate image
+async function generateImage(ctx: any, prompt: string, apiUrl: string, engineName: string) {
+  if (!prompt) return ctx.reply(`⚠️ Please provide a prompt.`, { parse_mode: "Markdown" });
+
+  const loadingMsg = await ctx.reply(`🎨 *Generating with ${engineName}...*\n⏳ Please wait, this may take a few seconds...`, { parse_mode: "Markdown" });
+
+  try {
+    const fullUrl = `${apiUrl}?prompt=${encodeURIComponent(prompt)}`;
+    
+    // Fetch image as buffer to ensure it exists and is valid
+    const response = await axios.get(fullUrl, { responseType: 'arraybuffer' });
+    const imageBuffer = Buffer.from(response.data, 'binary');
+
+    await ctx.replyWithPhoto({ source: imageBuffer }, {
+      caption: `✨ *Generated with ${engineName}*\n📝 *Prompt:* \`${prompt}\`\n\n👤 *By:* ${DEV_INFO.name}`,
+      parse_mode: "Markdown"
+    });
+    
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+  } catch (error) {
+    console.error(`Error generating ${engineName} image:`, error);
+    await ctx.telegram.editMessageText(
+      ctx.chat.id, 
+      loadingMsg.message_id, 
+      undefined, 
+      `❌ *Generation Failed*\n\nThe API might be busy or the prompt was rejected.\nPlease try again later.`
+    ).catch(() => {});
+  }
+}
 
 bot.command("ultra", async (ctx) => {
   const prompt = ctx.message.text.replace("/ultra", "").trim();
-  if (!prompt) return ctx.reply("⚠️ Please provide a prompt. Example: `/ultra A futuristic city`", { parse_mode: "Markdown" });
-
-  const loadingMsg = await ctx.reply("🎨 Generating Ultra image... Please wait.");
-
-  try {
-    const apiUrl = `${FLUX_API_ULTRA}?prompt=${encodeURIComponent(prompt)}`;
-    await ctx.replyWithPhoto(apiUrl, {
-      caption: `✨ *Generated with Flux 1.1 Pro Ultra*\nPrompt: \`${prompt}\`\n\nBy: ${DEV_INFO.name}`,
-      parse_mode: "Markdown"
-    });
-    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-  } catch (error) {
-    console.error("Error generating ultra image:", error);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, "❌ Failed to generate image. The API might be busy or down.").catch(() => {});
-  }
+  await generateImage(ctx, prompt, FLUX_API_ULTRA, "Flux 1.1 Ultra");
 });
 
 bot.command("pro", async (ctx) => {
   const prompt = ctx.message.text.replace("/pro", "").trim();
-  if (!prompt) return ctx.reply("⚠️ Please provide a prompt. Example: `/pro A cute cat`", { parse_mode: "Markdown" });
-
-  const loadingMsg = await ctx.reply("🎨 Generating Pro image... Please wait.");
-
-  try {
-    const apiUrl = `${FLUX_API_PRO}?prompt=${encodeURIComponent(prompt)}`;
-    await ctx.replyWithPhoto(apiUrl, {
-      caption: `✨ *Generated with Flux 1.1 Pro*\nPrompt: \`${prompt}\`\n\nBy: ${DEV_INFO.name}`,
-      parse_mode: "Markdown"
-    });
-    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-  } catch (error) {
-    console.error("Error generating pro image:", error);
-    await ctx.telegram.editMessageText(ctx.chat.id, loadingMsg.message_id, undefined, "❌ Failed to generate image. The API might be busy or down.").catch(() => {});
-  }
+  await generateImage(ctx, prompt, FLUX_API_PRO, "Flux 1.1 Pro");
 });
 
-bot.action("admin_panel", (ctx) => {
+// --- Admin Panel ---
+
+bot.hears('🔐 Admin Panel', (ctx) => {
   const userId = ctx.from?.id.toString();
   if (!userId || !ADMIN_IDS.includes(userId)) {
-    return ctx.answerCbQuery("⛔ Access Denied");
+    return ctx.reply("⛔ *Access Denied*\nThis area is for admins only.", { parse_mode: "Markdown" });
   }
-  ctx.replyWithMarkdown(
-    `🔐 *Admin Panel*
 
-Welcome, Admin. Control your bot below.`,
+  ctx.replyWithMarkdown(
+    `🔐 *Admin Control Panel*
+
+Welcome back, Admin.`,
     Markup.inlineKeyboard([
-      [Markup.button.callback("📊 Stats", "admin_stats"), Markup.button.callback("📢 Broadcast", "admin_broadcast")],
-      [Markup.button.callback("⚙️ Settings", "admin_settings")],
-      [Markup.button.callback("🔙 Back", "back_home")]
+      [Markup.button.callback("📊 View Stats", "admin_stats")],
+      [Markup.button.callback("📢 Broadcast Message", "admin_broadcast")]
     ])
-  ).catch(() => {});
+  );
 });
 
 bot.action("admin_stats", (ctx) => {
-    ctx.answerCbQuery("📊 Stats: Bot is running smoothly.");
-    ctx.reply("📊 *Statistics*\n\nStatus: Online\nPlatform: Vercel Serverless", { parse_mode: "Markdown" }).catch(() => {});
+    ctx.answerCbQuery();
+    ctx.reply("📊 *System Stats*\n\n🟢 Status: Online\n⚡ Platform: Vercel Serverless\n📅 Uptime: Always On", { parse_mode: "Markdown" });
 });
 
 bot.action("admin_broadcast", (ctx) => {
-    ctx.answerCbQuery("📢 Broadcast feature coming soon.");
-    ctx.reply("📢 To broadcast, this feature needs a database to store user IDs. (Not implemented in this demo)").catch(() => {});
+    ctx.answerCbQuery();
+    ctx.reply("📢 Broadcast feature requires a database connection (not configured in this demo).");
 });
 
-bot.action("admin_settings", (ctx) => {
-    ctx.answerCbQuery("⚙️ Settings");
-    ctx.reply("⚙️ *Bot Settings*\n\nMode: Production\nEngine: Flux 1.1 Pro", { parse_mode: "Markdown" }).catch(() => {});
-});
+// --- Vercel Handler ---
 
-// Vercel Handler
 export default async function handler(req: any, res: any) {
   try {
     if (req.method === 'POST') {
-      // Ensure body is parsed
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-      
-      if (!body) {
-        return res.status(400).json({ error: 'No body provided' });
-      }
+      if (!body) return res.status(400).json({ error: 'No body provided' });
 
       await bot.handleUpdate(body);
       res.status(200).json({ status: 'ok' });
     } else {
-      res.status(200).json({ status: 'ready', message: 'Bot is running. Send POST requests to this endpoint.' });
+      res.status(200).json({ status: 'ready', message: 'Bot is running.' });
     }
   } catch (error: any) {
     console.error('Error handling update:', error);
-    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 }
