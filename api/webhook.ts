@@ -3,7 +3,8 @@ import { setupBot } from '../src/bot';
 
 // Vercel Serverless Function Handler
 export default async function handler(req: any, res: any) {
-  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  // Use environment variable if available, otherwise use hardcoded token
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8357254222:AAFtChNHEUGcnz92s6uxO9-BNuCcIZdp4Ow";
 
   if (!BOT_TOKEN) {
     return res.status(500).json({ error: 'Bot token not configured' });

@@ -4,7 +4,7 @@ import { Telegraf } from "telegraf";
 import { setupBot, BotContext } from "./src/bot";
 
 const PORT = 3000;
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8357254222:AAFtChNHEUGcnz92s6uxO9-BNuCcIZdp4Ow";
 
 async function startServer() {
   const app = express();
