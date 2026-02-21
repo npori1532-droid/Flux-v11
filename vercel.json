@@ -1,6 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/api/webhook", "destination": "/api/webhook.ts" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
